@@ -1,6 +1,7 @@
 const url = require('url');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 
 const server = new http.Server();
 
@@ -12,7 +13,24 @@ server.on('request', (req, res) => {
 
   switch (req.method) {
     case 'GET':
-
+      if (/\//.test(pathname)) {
+        res.statusCode = 400;
+        res.end('nested path is not supported');
+      }
+      const stream = fs.createReadStream(filepath);
+      stream.pipe(res);
+      stream.on('error', (error) => {
+        if (error.code === 'ENOENT') {
+          res.statusCode = 404;
+          res.end('file not found');
+        } else {
+          res.statusCode = 500;
+          res.end('smth went wrong');
+        }
+      });
+      req.on('aborted', () => {
+        stream.destroy();
+      });
       break;
 
     default:
