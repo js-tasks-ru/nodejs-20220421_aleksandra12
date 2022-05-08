@@ -48,7 +48,6 @@ server.on('request', (req, res) => {
 								})
 						} catch {
 							limitedStream.on('data', () => {
-								console.log('test');
 								const outStream = fs.createWriteStream(filepath);
 								limitedStream.pipe(outStream);
 								outStream.write(fileContent);
