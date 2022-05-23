@@ -14,16 +14,12 @@ server.on('request', (req, res) => {
 
 	switch (req.method) {
 		case 'POST':
-			const body = [];
-			req.on('data', chunk => body.push(chunk));
-			req.on('end', () => {
 				try {
 					if (/\//.test(pathname)) {
 						res.statusCode = 400;
 						res.end('nested path is not supported');
 						return;
 					}
-					const fileContent = Buffer.concat(body).toString('utf-8');
 
 					const limitedStream = new LimitSizeStream({
 						limit: 1048576,
@@ -47,25 +43,22 @@ server.on('request', (req, res) => {
 									res.end('file already exists');
 								})
 						} catch {
-							limitedStream.on('data', () => {
-								const outStream = fs.createWriteStream(filepath);
-								limitedStream.pipe(outStream);
-								outStream.write(fileContent);
-								outStream.on('finish', () => {
-									res.statusCode = 201;
-									res.end();
-								});
-							});
-							limitedStream.write(fileContent);
+							const outStream = fs.createWriteStream(filepath);
 
-							limitedStream.end();
+							req.pipe(limitedStream).pipe(outStream);
+
+							outStream.on('finish', () => {
+								res.statusCode = 201;
+								res.end();
+							});
 
 							limitedStream.on('error', (error) => {
 								if (error.code === 'LIMIT_EXCEEDED') {
-									fs.rm(filepath, () => {
+									outStream.destroy();
+						            fs.rm(filepath, {force: true}, () => {
 										res.statusCode = 413;
 										res.end('file is too large');
-									});
+						            });
 								} else {
 									res.statusCode = 500;
 									res.end('internal error');
@@ -74,6 +67,8 @@ server.on('request', (req, res) => {
 
 							req.on('aborted', () => {
 								limitedStream.destroy();
+								outStream.destroy();
+								fs.rm(filepath, {force: true}, () => {});
 							});
 						}
 					})();
@@ -81,7 +76,6 @@ server.on('request', (req, res) => {
 					res.statusCode = 500;
 					res.end('internal error');
 				}
-			});
 			break;
 
 		default:

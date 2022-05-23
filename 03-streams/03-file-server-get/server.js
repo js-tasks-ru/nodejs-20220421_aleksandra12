@@ -16,6 +16,7 @@ server.on('request', (req, res) => {
       if (/\//.test(pathname)) {
         res.statusCode = 400;
         res.end('nested path is not supported');
+        return;
       }
       const stream = fs.createReadStream(filepath);
       stream.pipe(res);
